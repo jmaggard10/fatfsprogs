@@ -31,9 +31,6 @@ static const char rcsid[] =
 #endif /* not lint */
 
 #include <sys/param.h>
-#include <sys/fdcio.h>
-#include <sys/disk.h>
-#include <sys/disklabel.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -285,8 +282,8 @@ mkfs_msdos(const char *fname, const char *dtype, const struct msdos_options *op)
 	if (!S_ISREG(sb.st_mode))
 	    warnx("warning, %s is not a regular file", fname);
     } else {
-	if (!S_ISCHR(sb.st_mode))
-	    warnx("warning, %s is not a character device", fname);
+	if (!S_ISBLK(sb.st_mode))
+	    warnx("warning, %s is not a block device", fname);
     }
     if (!o.no_create)
 	if (check_mounted(fname, sb.st_mode) == -1)
@@ -766,30 +763,21 @@ done:
 static int
 check_mounted(const char *fname, mode_t mode)
 {
-    struct statfs *mp;
-    const char *s1, *s2;
-    size_t len;
-    int n, r;
+    FILE *f;
+    char buf[255];
+    (void)mode;
 
-    if (!(n = getmntinfo(&mp, MNT_NOWAIT))) {
-	warn("getmntinfo");
-	return -1;
-    }
-    len = strlen(_PATH_DEV);
-    s1 = fname;
-    if (!strncmp(s1, _PATH_DEV, len))
-	s1 += len;
-    r = S_ISCHR(mode) && s1 != fname && *s1 == 'r';
-    for (; n--; mp++) {
-	s2 = mp->f_mntfromname;
-	if (!strncmp(s2, _PATH_DEV, len))
-	    s2 += len;
-	if ((r && s2 != mp->f_mntfromname && !strcmp(s1 + 1, s2)) ||
-	    !strcmp(s1, s2)) {
-	    warnx("%s is mounted on %s", fname, mp->f_mntonname);
+    f = fopen("/proc/mounts", "r");
+    if (!f)
+        return -1;
+    while (fgets(buf, sizeof(buf), f)) {
+	if (!strncmp(buf, fname, strlen(fname))) {
+            fclose(f);
+	    warnx("%s is mounted on %s", fname, buf);
 	    return -1;
 	}
     }
+    fclose(f);
     return 0;
 }
 
@@ -811,6 +799,12 @@ getstdfmt(const char *fmt, struct bpb *bpb)
     return 0;
 }
 
+struct disklabel {
+    u_int32_t d_secsize;
+    u_int64_t d_nsectors;
+    u_int64_t d_ntracks;
+    u_int32_t d_secperunit;
+};
 /*
  * Get disk slice, partition, and geometry information.
  */
@@ -819,57 +813,39 @@ getdiskinfo(int fd, const char *fname, const char *dtype, __unused int oflag,
 	    struct bpb *bpb)
 {
     struct disklabel *lp, dlp;
-    struct fd_type type;
     off_t ms, hs = 0;
 
     lp = NULL;
 
-    /* If the user specified a disk type, try to use that */
-    if (dtype != NULL) {
-	lp = getdiskbyname(dtype);
-    }
+    /* Maybe it's a file */
+    if (ioctl(fd, BLKGETSIZE64, &ms) == -1) {
+	struct stat st;
 
-    /* Maybe it's a floppy drive */
-    if (lp == NULL) {
-	if (ioctl(fd, DIOCGMEDIASIZE, &ms) == -1) {
-	    struct stat st;
-
-	    if (fstat(fd, &st))
-		err(1, "cannot get disk size");
-	    /* create a fake geometry for a file image */
-	    ms = st.st_size;
-	    dlp.d_secsize = 512;
-	    dlp.d_nsectors = 63;
-	    dlp.d_ntracks = 255;
-	    dlp.d_secperunit = ms / dlp.d_secsize;
-	    lp = &dlp;
-	} else if (ioctl(fd, FD_GTYPE, &type) != -1) {
-	    dlp.d_secsize = 128 << type.secsize;
-	    dlp.d_nsectors = type.sectrac;
-	    dlp.d_ntracks = type.heads;
-	    dlp.d_secperunit = ms / dlp.d_secsize;
-	    lp = &dlp;
-	}
+	if (fstat(fd, &st))
+	    err(1, "cannot get disk size");
+	/* create a fake geometry for a file image */
+	ms = st.st_size;
+	dlp.d_secsize = 512;
+	dlp.d_nsectors = 63;
+	dlp.d_ntracks = 255;
+	dlp.d_secperunit = ms / dlp.d_secsize;
+	lp = &dlp;
     }
 
     /* Maybe it's a fixed drive */
     if (lp == NULL) {
 	if (bpb->bpbBytesPerSec)
 	    dlp.d_secsize = bpb->bpbBytesPerSec;
-	if (bpb->bpbBytesPerSec == 0 && ioctl(fd, DIOCGSECTORSIZE,
+	if (bpb->bpbBytesPerSec == 0 && ioctl(fd, BLKSSZGET,
 					      &dlp.d_secsize) == -1)
 	    err(1, "cannot get sector size");
 
 	dlp.d_secperunit = ms / dlp.d_secsize;
 
-	if (bpb->bpbSecPerTrack == 0 && ioctl(fd, DIOCGFWSECTORS,
-					      &dlp.d_nsectors) == -1) {
-	    warn("cannot get number of sectors per track");
+	if (bpb->bpbSecPerTrack == 0)
 	    dlp.d_nsectors = 63;
-	}
-	if (bpb->bpbHeads == 0 &&
-	    ioctl(fd, DIOCGFWHEADS, &dlp.d_ntracks) == -1) {
-	    warn("cannot get number of heads");
+
+	if (bpb->bpbHeads == 0) {
 	    if (dlp.d_secperunit <= 63*1*1024)
 		dlp.d_ntracks = 1;
 	    else if (dlp.d_secperunit <= 63*16*1024)
@@ -977,7 +953,7 @@ mklabel(u_int8_t *dest, const char *src)
     int c, i;
 
     for (i = 0; i < 11; i++) {
-	c = *src ? toupper(*src++) : ' ';
+	c = *src ? *src++ : ' ';
 	*dest++ = !i && c == '\xe5' ? 5 : c;
     }
 }

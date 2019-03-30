@@ -32,6 +32,9 @@
 
 #include <sys/types.h>
 #include <stdbool.h>
+#include <stdint.h>
+#define __packed __attribute__((packed))
+#define __unused __attribute__((unused))
 #define ALLOPTS \
 AOPT('@', off_t, offset, 0, "Offset in device") \
 AOPT('A', bool, align, -2, "Attempt to cluster align root directory") \

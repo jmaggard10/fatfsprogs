@@ -36,6 +36,9 @@
 
 #define	LOSTDIR	"LOST.DIR"
 
+#ifndef __printflike
+#define __printflike(x, y) __attribute__((__format__ (__printf__, x, y)))
+#endif
 /*
  * Options:
  */

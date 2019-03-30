@@ -178,10 +178,10 @@ main(int argc, char *argv[])
     argv += optind;
     if (argc < 1 || argc > 2)
 	usage();
-	if (o.align) {
-		if (o.hidden_sectors_set)
-		    errx(1, "align (-A) is incompatible with -r");
-	}
+    if (o.align) {
+	if (o.hidden_sectors_set)
+	    errx(1, "align (-A) is incompatible with -r");
+    }
     fname = *argv++;
     if (!o.create_size && !strchr(fname, '/')) {
 	snprintf(buf, sizeof(buf), "%s%s", _PATH_DEV, fname);
@@ -266,7 +266,7 @@ static void
 usage(void)
 {
     fprintf(stderr,
-	    "usage: %s [ -options ] special [disktype]\n", getprogname());
+	    "usage: %s [ -options ] special [disktype]\n", "mkfs.fat");
     fprintf(stderr, "where the options are:\n");
 static struct {
     char o;
@@ -276,7 +276,8 @@ static struct {
 ALLOPTS
 #undef AOPT
     };
-    for (size_t i = 0; i < nitems(opts); i++)
+    size_t i;
+    for (i = 0; i < nitems(opts); i++)
 	fprintf(stderr, "\t-%c %s\n", opts[i].o, opts[i].h);
     exit(1);
 }

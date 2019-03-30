@@ -56,8 +56,8 @@ usage(void)
 {
 
 	fprintf(stderr, "%s\n%s\n",
-	    "usage: fsck_msdosfs -p [-f] filesystem ...",
-	    "       fsck_msdosfs [-ny] filesystem ...");
+	    "usage: fsck.fat -p [-f] filesystem ...",
+	    "       fsck.fat [-ny] filesystem ...");
 	exit(1);
 }
 

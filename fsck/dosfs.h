@@ -86,8 +86,8 @@ struct bootblock {
 struct fatEntry {
 	cl_t	next;			/* pointer to next cluster */
 	cl_t	head;			/* pointer to start of chain */
-	u_int32_t length;		/* number of clusters on chain */
-	int	flags;			/* see below */
+	u_int32_t length:31;		/* number of clusters on chain */
+	int	flags:1;		/* see below */
 };
 
 #define	CLUST_FREE	0		/* 0 means cluster is free */

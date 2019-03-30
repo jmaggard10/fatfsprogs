@@ -322,10 +322,12 @@ mkfs_msdos(const char *fname, const char *dtype, const struct msdos_options *op)
 		bpb.bpbSecPerClust = 8;
 	    else if (bpb.bpbHugeSectors <= (1<<19)) /* 256M -> 8k */
 		bpb.bpbSecPerClust = 16;
-	    else if (bpb.bpbHugeSectors <= (1<<21)) /* 1G -> 16k */
+	    else if (bpb.bpbHugeSectors <= (1<<22)) /* 2G -> 16k */
 		bpb.bpbSecPerClust = 32;
+	    else if (bpb.bpbHugeSectors <= (1<<27)) /* 64G -> 32k */
+		bpb.bpbSecPerClust = 64;
 	    else
-		bpb.bpbSecPerClust = 64;		/* otherwise 32k */
+		bpb.bpbSecPerClust = 128;		/* otherwise 64k */
 	}
     }
     if (!powerof2(bpb.bpbBytesPerSec)) {

@@ -49,7 +49,6 @@ checkfilesys(const char *fname)
 	struct bootblock boot;
 	struct fatEntry *fat = NULL;
 	int finish_dosdirsection=0;
-	u_int i;
 	int mod = 0;
 	int ret = 8;
 
@@ -99,21 +98,6 @@ checkfilesys(const char *fname)
 		close(dosfs);
 		return 8;
 	}
-
-	if (boot.ValidFat < 0)
-		for (i = 1; i < boot.bpbFATs; i++) {
-			struct fatEntry *currentFat;
-
-			mod |= readfat(dosfs, &boot, i, &currentFat);
-
-			if (mod & FSFATAL)
-				goto out;
-
-			mod |= comparefat(&boot, fat, currentFat, i);
-			free(currentFat);
-			if (mod & FSFATAL)
-				goto out;
-		}
 
 	if (!preen)
 		printf("** Phase 2 - Check Cluster Chains\n");

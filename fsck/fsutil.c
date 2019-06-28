@@ -124,7 +124,7 @@ perr(const char *fmt, ...)
 size_t
 strlcpy(char *dst, const char *src, size_t len)
 {
-        strncpy(dst, src ? src : "", len);
-        dst[len - 1] = '\0';
+	strncpy(dst, src?:"", len);
+	dst[len - 1] = '\0';
 	return strlen(dst) + 1;
 }
